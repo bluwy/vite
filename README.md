@@ -12,7 +12,7 @@
 </p>
 <br/>
 
-# Vite ⚡
+# Vite
 
 > Next Generation Frontend Tooling
 

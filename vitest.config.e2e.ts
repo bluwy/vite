@@ -2,6 +2,7 @@ import { resolve } from 'path'
 import { defineConfig } from 'vitest/config'
 
 const timeout = process.env.CI ? 50000 : 30000
+const ciMaxThreads = process.platform === 'linux' ? 2 : 1
 
 export default defineConfig({
   resolve: {
@@ -21,7 +22,7 @@ export default defineConfig({
       if (log.match(/experimental|jit engine|emitted file|tailwind/i))
         return false
     },
-    maxThreads: process.env.CI ? 1 : undefined,
+    maxThreads: process.env.CI ? ciMaxThreads : undefined,
     minThreads: process.env.CI ? 1 : undefined
   },
   esbuild: {

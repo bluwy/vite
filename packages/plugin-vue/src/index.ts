@@ -1,5 +1,5 @@
 import fs from 'fs'
-import type { Plugin, ViteDevServer } from 'vite'
+import type { Plugin, UserConfig, ViteDevServer } from 'vite'
 import { createFilter } from 'vite'
 /* eslint-disable import/no-duplicates */
 import type {
@@ -19,6 +19,7 @@ import { handleHotUpdate } from './handleHotUpdate'
 import { transformTemplateAsModule } from './template'
 import { transformStyle } from './style'
 import { EXPORT_HELPER_ID, helperCode } from './helper'
+import { esbuildVuePlugin, saveVueMetadata } from './optimizer'
 
 export { parseVueRequest } from './utils/query'
 export type { VueQuery } from './utils/query'
@@ -60,6 +61,13 @@ export interface Options {
    * Use custom compiler-sfc instance. Can be used to force a specific version.
    */
   compiler?: typeof _compiler
+
+  /**
+   * Optimize Vue files inside node_modules
+   * @experimental
+   * @default false
+   */
+  optimizeVueDeps?: boolean
 }
 
 export interface ResolvedOptions extends Options {
@@ -117,8 +125,8 @@ export default function vuePlugin(rawOptions: Options = {}): Plugin {
       return handleHotUpdate(ctx, options)
     },
 
-    config(config) {
-      return {
+    async config(config) {
+      const newConfig: UserConfig = {
         define: {
           __VUE_OPTIONS_API__: config.define?.__VUE_OPTIONS_API__ ?? true,
           __VUE_PROD_DEVTOOLS__: config.define?.__VUE_PROD_DEVTOOLS__ ?? false
@@ -127,6 +135,29 @@ export default function vuePlugin(rawOptions: Options = {}): Plugin {
           external: ['vue', '@vue/server-renderer']
         }
       }
+
+      if (options.optimizeVueDeps) {
+        newConfig.optimizeDeps = {
+          extensions: ['.vue'],
+          esbuildOptions: {
+            plugins: [esbuildVuePlugin(options)]
+          }
+        }
+
+        // TODO:
+        // 1. `cacheDir` can be changed by plugins.
+        // 2. `cacheDir` can be `.vite` when there's no `package.json`. Does it matter here?
+        const metadataChanged = await saveVueMetadata(
+          config.cacheDir ?? 'node_modules/.vite',
+          options
+        )
+
+        if (metadataChanged) {
+          newConfig.force = true
+        }
+      }
+
+      return newConfig
     },
 
     configResolved(config) {
